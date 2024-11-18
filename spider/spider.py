@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:37:35 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 13:53:16 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 16:35:36 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -21,6 +21,7 @@ from colorama import init, Fore, Style
 from fake_useragent import UserAgent
 import time
 import random
+import re
 
 # Inits
 init(autoreset=True)
@@ -91,18 +92,31 @@ def is_valid_image_extension(url):
     filename = os.path.basename(urlparse(url).path).lower()
     return any(filename.endswith(ext) for ext in valid_extensions)
 
+def extract_images_from_html(html_content, url):
+    img_urls = set()
+    # Suche nach Bild-URLs in allen Attributen (CSS und inline-Styles eingeschlossen)
+    pattern = r'(https?://[^\s"\']+\.(?:jpg|jpeg|png|gif|bmp|svg))'
+    matches = re.findall(pattern, html_content)
+    for match in matches:
+        full_url = urljoin(url, match)
+        if is_valid_url(full_url):
+            img_urls.add(full_url)
+    return img_urls
+
 # Fetch and download all images from a given URL.
 def fetch_images(url, output_path, session, indent_level=0):
     indent = "  " * indent_level
     images_found = []
     try:
         response = fetch_with_retry(url, session)
-        soup = BeautifulSoup(response.text, "html.parser")
+        html_content = response.text
+        soup = BeautifulSoup(html_content, "html.parser")
+
+        # Bilder aus img-Tags
         img_tags = soup.find_all("img")
-        
-        if img_tags:
-            print(f"{indent}{Fore.CYAN}Images detected on {Fore.YELLOW}{url}{Style.RESET_ALL}:")
-        
+        print(f"{indent}{Fore.CYAN}Images detected on {Fore.YELLOW}{url}{Style.RESET_ALL}:")
+
+        # Img-Tags verarbeiten
         for img in img_tags:
             img_url = img.get("src")
             if img_url:
@@ -117,14 +131,19 @@ def fetch_images(url, output_path, session, indent_level=0):
                     elif not success and not full_url in downloaded_images:
                         print(f"{indent}  {Fore.RED}✗ Download failed{Style.RESET_ALL}")
         
-        if not img_tags:
-            print(f"{indent}{Fore.YELLOW}No images found here!{Style.RESET_ALL}")
-            
+        # Zusätzliche Bild-URLs aus HTML-Inhalt (CSS, Header)
+        inline_images = extract_images_from_html(html_content, url)
+        for inline_img in inline_images:
+            if inline_img not in images_found:
+                print(f"{indent}→ {Fore.MAGENTA}{inline_img}{Style.RESET_ALL}")
+                download_image(inline_img, output_path)
+
         return images_found
             
     except requests.RequestException as e:
         print(f"{indent}{Fore.RED}Error fetching images from {url}: {e}{Style.RESET_ALL}")
         return images_found
+
 
 # Download an image and save it to the output path.
 def download_image(img_url, output_path):
@@ -156,24 +175,129 @@ def download_image(img_url, output_path):
         print(f"{Fore.RED}Error downloading {img_url}: {e}{Style.RESET_ALL}")
         return False
 
+# Fetch all CSS and JS files linked from a given URL.
+def fetch_external_assets(url, session):
+    try:
+        response = fetch_with_retry(url, session)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        css_urls = set()
+        js_urls = set()
+
+        for link in soup.find_all("link", rel="stylesheet", href=True):
+            css_url = link.get("href")
+            full_url = urljoin(url, css_url)
+            if is_valid_url(full_url):
+                css_urls.add(full_url)
+
+        for script in soup.find_all("script", src=True):
+            js_url = script.get("src")
+            full_url = urljoin(url, js_url)
+            if is_valid_url(full_url):
+                js_urls.add(full_url)
+        
+        # Log the found CSS and JS URLs
+        if css_urls:
+            print(f"{Fore.CYAN}Found CSS files:{Style.RESET_ALL}")
+            for css_url in css_urls:
+                print(f"→ {Fore.YELLOW}{css_url}{Style.RESET_ALL}")
+
+        if js_urls:
+            print(f"{Fore.CYAN}Found JS files:{Style.RESET_ALL}")
+            for js_url in js_urls:
+                print(f"→ {Fore.YELLOW}{js_url}{Style.RESET_ALL}")
+
+        return css_urls, js_urls
+    
+    except requests.RequestException as e:
+        print(f"{Fore.RED}Error fetching assets from {url}: {e}{Style.RESET_ALL}")
+        return set(), set()
+    
+# Extract image URLs from CSS content
+def extract_images_from_css(css_content, url):
+    img_urls = set()
+    # Regex to match background-image URLs in CSS
+    import re
+    pattern = r'url\((\'|\"|)(.*?)\1\)'
+    matches = re.findall(pattern, css_content)
+
+    for match in matches:
+        img_url = match[1]
+        full_url = urljoin(url, img_url)
+        if is_valid_url(full_url) and is_valid_image_extension(full_url):
+            img_urls.add(full_url)
+    return img_urls
+
+# Fetch and process images from a CSS file.
+def fetch_images_from_css(css_url, session, url, output_path):
+    try:
+        response = fetch_with_retry(css_url, session)
+        img_urls = extract_images_from_css(response.text, url)
+        for img_url in img_urls:
+            download_image(img_url, output_path)
+    except requests.RequestException as e:
+        print(f"{Fore.RED}Error fetching CSS {css_url}: {e}{Style.RESET_ALL}")
+
+# Extract image URLs from JS content (using regex to catch Image().src patterns).
+def extract_images_from_js(js_content, url):
+    img_urls = set()
+    pattern = r'Image\(\).src\s*=\s*(\'|\"|)(.*?)\1'
+    matches = re.findall(pattern, js_content)
+
+    for match in matches:
+        img_url = match[1]
+        full_url = urljoin(url, img_url)
+        if is_valid_url(full_url) and is_valid_image_extension(full_url):
+            img_urls.add(full_url)
+    return img_urls
+
+# Fetch and process images from a JS file.
+def fetch_images_from_js(js_url, session, url, output_path):
+    try:
+        response = fetch_with_retry(js_url, session)
+        img_urls = extract_images_from_js(response.text, url)
+        for img_url in img_urls:
+            download_image(img_url, output_path)
+    except requests.RequestException as e:
+        print(f"{Fore.RED}Error fetching JS {js_url}: {e}{Style.RESET_ALL}")
+
 # recursive crawling
 def crawl(url, depth, visited=None, output_path="./data/"):
     if visited is None:
         visited = set()
-        
-    session = get_session()
-    
+
+    # Skip if URL has already been visited
     if depth == 0 or url in visited:
         return
 
-    print(f"\n{Fore.MAGENTA}Crawling: {url} (depth {depth}){Style.RESET_ALL}")
+    # Mark URL as visited
     visited.add(url)
+    session = get_session()
 
+    print(f"\n{Fore.MAGENTA}Crawling: {url} (depth {depth}){Style.RESET_ALL}")
+
+    # Fetch and download images from the URL
     fetch_images(url, output_path, session)
 
+    # Fetch CSS and JS files for additional image sources
+    css_urls, js_urls = fetch_external_assets(url, session)
+
+    for css_url in css_urls:
+        if css_url not in visited:
+            fetch_images_from_css(css_url, session, url, output_path)
+            visited.add(css_url)
+
+    for js_url in js_urls:
+        if js_url not in visited:
+            fetch_images_from_js(js_url, session, url, output_path)
+            visited.add(js_url)
+
+    # Fetch links and recursively crawl them
     links = fetch_links(url, session)
     for link in links:
-        crawl(link, depth - 1, visited, output_path)
+        if link not in visited:
+            crawl(link, depth - 1, visited, output_path)
+
 
 # arg parsing and running crawl
 def main():
