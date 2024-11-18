@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:37:35 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 17:55:44 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 20:46:18 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -26,6 +26,7 @@ import re
 # Inits
 init(autoreset=True)
 downloaded_images = set()
+processed_assets = set()
 
 # Imitate a real Client
 def get_session():
@@ -156,7 +157,20 @@ def download_image(img_url, output_path):
     try:
         response = requests.get(img_url, stream=True)
         response.raise_for_status()
-        filename = os.path.basename(urlparse(img_url).path)
+        
+        parsed_url = urlparse(img_url)
+        hostname = parsed_url.netloc
+        
+        path = os.path.basename(parsed_url.path)
+        if not path:
+            path = 'image.jpg'
+            
+        filename = f"{hostname.split('.')[0]}_{path}"
+        
+        if len(filename) > 255:
+            name, ext = os.path.splitext(filename)
+            filename = name[:250] + ext
+            
         filepath = os.path.join(output_path, filename)
         
         with open(filepath, "wb") as f:
@@ -171,9 +185,13 @@ def download_image(img_url, output_path):
         print(f"{Fore.RED}Error downloading {img_url}: {e}{Style.RESET_ALL}")
         return False
 
-# Fetch all CSS and JS files linked from a given URL.
 def fetch_external_assets(url, session):
     try:
+        if url in processed_assets:
+            return set(), set()
+            
+        processed_assets.add(url)
+        
         response = fetch_with_retry(url, session)
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -192,7 +210,6 @@ def fetch_external_assets(url, session):
             if is_valid_url(full_url):
                 js_urls.add(full_url)
         
-        # Log the found CSS and JS URLs
         if css_urls:
             print(f"{Fore.CYAN}Found CSS files:{Style.RESET_ALL}")
             for css_url in css_urls:
@@ -212,7 +229,6 @@ def fetch_external_assets(url, session):
 # Extract image URLs from CSS content
 def extract_images_from_css(css_content, url):
     img_urls = set()
-    # Regex to match background-image URLs in CSS
     import re
     pattern = r'url\((\'|\"|)(.*?)\1\)'
     matches = re.findall(pattern, css_content)
@@ -262,20 +278,16 @@ def crawl(url, depth, visited=None, output_path="./data/"):
     if visited is None:
         visited = set()
 
-    # Skip if URL has already been visited
     if depth == 0 or url in visited:
         return
 
-    # Mark URL as visited
     visited.add(url)
     session = get_session()
 
     print(f"\n{Fore.MAGENTA}Crawling: {url} (depth {depth}){Style.RESET_ALL}")
 
-    # Fetch and download images from the URL
     fetch_images(url, output_path, session)
 
-    # Fetch CSS and JS files for additional image sources
     css_urls, js_urls = fetch_external_assets(url, session)
 
     for css_url in css_urls:
@@ -288,7 +300,6 @@ def crawl(url, depth, visited=None, output_path="./data/"):
             fetch_images_from_js(js_url, session, url, output_path)
             visited.add(js_url)
 
-    # Fetch links and recursively crawl them
     links = fetch_links(url, session)
     for link in links:
         if link not in visited:
@@ -347,9 +358,9 @@ def main():
     print(f"\n{Fore.CYAN}Starting download...{Style.RESET_ALL}")
 
     if args.r and args.l:
-        crawl(args.URL, args.l)
+        crawl(args.URL, args.l, None, output_path)
     else:
-        crawl(args.URL, 1)
+        crawl(args.URL, 1, None, output_path)
 
 if __name__ == "__main__":
     main()

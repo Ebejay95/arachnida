@@ -1,7 +1,0 @@
-*
-
-!/.gitignore
-!/spider/Makefile
-!/spider/spider.py
-!/scorpion/Makefile
-!/scorpion/scorpion.py
