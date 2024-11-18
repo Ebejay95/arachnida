@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:37:35 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 16:56:06 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 17:55:44 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -94,7 +94,6 @@ def is_valid_image_extension(url):
 
 def extract_images_from_html(html_content, url):
     img_urls = set()
-    # Suche nach Bild-URLs in allen Attributen (CSS und inline-Styles eingeschlossen)
     pattern = r'(https?://[^\s"\']+\.(?:jpg|jpeg|png|gif|bmp))'
     matches = re.findall(pattern, html_content)
     for match in matches:
@@ -112,11 +111,9 @@ def fetch_images(url, output_path, session, indent_level=0):
         html_content = response.text
         soup = BeautifulSoup(html_content, "html.parser")
 
-        # Bilder aus img-Tags
         img_tags = soup.find_all("img")
         print(f"{indent}{Fore.CYAN}Images detected on {Fore.YELLOW}{url}{Style.RESET_ALL}:")
 
-        # Img-Tags verarbeiten
         for img in img_tags:
             img_url = img.get("src")
             if img_url:
@@ -131,7 +128,6 @@ def fetch_images(url, output_path, session, indent_level=0):
                     elif not success and not full_url in downloaded_images:
                         print(f"{indent}  {Fore.RED}✗ Download failed{Style.RESET_ALL}")
         
-        # Zusätzliche Bild-URLs aus HTML-Inhalt (CSS, Header)
         inline_images = extract_images_from_html(html_content, url)
         for inline_img in inline_images:
             if inline_img not in images_found:
