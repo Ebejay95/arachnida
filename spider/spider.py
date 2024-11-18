@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:37:35 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 13:25:55 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 13:53:16 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -18,10 +18,28 @@ from urllib.parse import urljoin, urlparse
 import argparse
 import sys
 from colorama import init, Fore, Style
+from fake_useragent import UserAgent
+import time
+import random
 
 # Inits
 init(autoreset=True)
 downloaded_images = set()
+
+# Imitate a real Client
+def get_session():
+    session = requests.Session()
+    
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'DNT': '1'
+    })
+    
+    return session
 
 # Check if a URL is valid.
 def is_valid_url(url):
@@ -38,11 +56,23 @@ def validate_depth(value):
     except ValueError:
         raise argparse.ArgumentTypeError(f"{value} is not a valid integer.")
 
+# Interval based fetching for imitating human behavior ad retries
+def fetch_with_retry(url, session, max_retries=3):
+    for i in range(max_retries):
+        try:
+            time.sleep(random.uniform(2, 5))
+            response = session.get(url)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            if i == max_retries - 1:
+                raise e
+            time.sleep(random.uniform(5, 10))
+
 # Fetch all links from a given URL.
-def fetch_links(url):
+def fetch_links(url, session):
     try:
-        response = requests.get(url)
-        response.raise_for_status()
+        response = fetch_with_retry(url, session)
         soup = BeautifulSoup(response.text, "html.parser")
         links = set()
         for a_tag in soup.find_all("a", href=True):
@@ -62,12 +92,11 @@ def is_valid_image_extension(url):
     return any(filename.endswith(ext) for ext in valid_extensions)
 
 # Fetch and download all images from a given URL.
-def fetch_images(url, output_path, indent_level=0):
+def fetch_images(url, output_path, session, indent_level=0):
     indent = "  " * indent_level
     images_found = []
     try:
-        response = requests.get(url)
-        response.raise_for_status()
+        response = fetch_with_retry(url, session)
         soup = BeautifulSoup(response.text, "html.parser")
         img_tags = soup.find_all("img")
         
@@ -124,25 +153,29 @@ def download_image(img_url, output_path):
         return True
         
     except requests.RequestException as e:
-        if img_url not in downloaded_imar.add_argument(
-        "-l",
+        print(f"{Fore.RED}Error downloading {img_url}: {e}{Style.RESET_ALL}")
+        return False
 
+# recursive crawling
 def crawl(url, depth, visited=None, output_path="./data/"):
     if visited is None:
         visited = set()
-
+        
+    session = get_session()
+    
     if depth == 0 or url in visited:
         return
 
     print(f"\n{Fore.MAGENTA}Crawling: {url} (depth {depth}){Style.RESET_ALL}")
     visited.add(url)
 
-    fetch_images(url, output_path)
+    fetch_images(url, output_path, session)
 
-    links = fetch_links(url)
+    links = fetch_links(url, session)
     for link in links:
         crawl(link, depth - 1, visited, output_path)
 
+# arg parsing and running crawl
 def main():
     parser = argparse.ArgumentParser(
         description="Spider program to recursively download images from a website."
