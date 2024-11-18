@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:37:35 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 16:35:36 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 16:56:06 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -95,7 +95,7 @@ def is_valid_image_extension(url):
 def extract_images_from_html(html_content, url):
     img_urls = set()
     # Suche nach Bild-URLs in allen Attributen (CSS und inline-Styles eingeschlossen)
-    pattern = r'(https?://[^\s"\']+\.(?:jpg|jpeg|png|gif|bmp|svg))'
+    pattern = r'(https?://[^\s"\']+\.(?:jpg|jpeg|png|gif|bmp))'
     matches = re.findall(pattern, html_content)
     for match in matches:
         full_url = urljoin(url, match)

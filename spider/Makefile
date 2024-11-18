@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:06:57 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 11:26:20 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 17:42:59 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -64,7 +64,13 @@ DIST_DIR	= dist
 #--------------                      DEPENDS                      -------------#
 #------------------------------------------------------------------------------#
 
-DEPENDS		= requests beautifulsoup4
+DEPENDS		= requests \
+			beautifulsoup4 \
+			fake_useragent \
+			colorama \
+			urllib3 \
+			argparse \
+			bs4
 
 #------------------------------------------------------------------------------#
 #--------------                      COMPILE                      -------------#
@@ -77,6 +83,7 @@ all: $(NAME)
 setup:
 	@echo "$(BLUE)Installing dependencies...$(X)"
 	@$(PIP) $(PIPFLAGS) $(DEPENDS)
+	@$(PIP) $(PIPFLAGS) pyinstaller
 
 $(NAME): $(SRC)
 	@if [ ! -f $(NAME) ] || [ $(SRC) -nt $(NAME) ]; then \
