@@ -6,7 +6,7 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:06:57 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 17:44:36 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/18 20:40:25 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -103,6 +103,8 @@ setup:
 	@$(PIP) $(PIPFLAGS) $(DEPENDS)
 
 $(NAME): $(SRC)
+	pip3 install pyinstaller
+	pip3 install requests beautifulsoup4 colorama fake-useragent pillow
 	@if [ ! -f $(NAME) ] || [ $(SRC) -nt $(NAME) ]; then \
 		echo "$(YELLOW)Building binary...$(X)"; \
 		$(PYINSTALLER) $(PYFLAGS) $(SRC); \
