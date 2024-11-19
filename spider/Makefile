@@ -6,11 +6,9 @@
 #    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/18 11:06:57 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 20:40:00 by joeberle         ###   ########.fr        #
+#    Updated: 2024/11/19 09:01:07 by joeberle         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
-
-
 
 #------------------------------------------------------------------------------#
 #--------------                       PRINT                       -------------#
@@ -43,7 +41,7 @@ $(RED)████████████████████████�
 NAME		= spider
 PYTHON		= python3
 PIP			= pip3
-PYINSTALLER	= ~/.local/bin/pyinstaller
+PYINSTALLER	= pyinstaller
 SRC			= spider.py
 
 #------------------------------------------------------------------------------#
@@ -51,7 +49,7 @@ SRC			= spider.py
 #------------------------------------------------------------------------------#
 
 PYFLAGS		= --onefile
-PIPFLAGS	= install --quiet --user
+PIPFLAGS	= install --quiet
 
 #------------------------------------------------------------------------------#
 #--------------                        DIR                        -------------#
@@ -78,7 +76,7 @@ DEPENDS		= requests \
 
 .PHONY: all setup clean fclean re
 
-all: $(NAME)
+all: setup $(NAME)
 
 setup:
 	@echo "$(BLUE)Installing dependencies...$(X)"
@@ -86,9 +84,6 @@ setup:
 	@$(PIP) $(PIPFLAGS) pyinstaller
 
 $(NAME): $(SRC)
-	pip3 install pyinstaller
-	pip3 install fake_useragent
-	pip3 install requests beautifulsoup4 colorama fake-useragent Pillow
 	@if [ ! -f $(NAME) ] || [ $(SRC) -nt $(NAME) ]; then \
 		echo "$(YELLOW)Building binary...$(X)"; \
 		$(PYINSTALLER) $(PYFLAGS) $(SRC); \
