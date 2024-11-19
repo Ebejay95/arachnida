@@ -1,14 +1,4 @@
-# **************************************************************************** #
-#                                                                              #
-#                                                         :::      ::::::::    #
-#    spider.py                                          :+:      :+:    :+:    #
-#                                                     +:+ +:+         +:+      #
-#    By: joeberle <joeberle@student.42.fr>          +#+  +:+       +#+         #
-#                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2024/11/18 11:37:35 by joeberle          #+#    #+#              #
-#    Updated: 2024/11/18 20:46:18 by joeberle         ###   ########.fr        #
-#                                                                              #
-# **************************************************************************** #
+#!/usr/bin/env python3
 
 # Imports
 import os
@@ -348,6 +338,10 @@ def main():
         except OSError as e:
             print(f"{Fore.RED}Error creating directory {output_path}: {e}{Style.RESET_ALL}", file=sys.stderr)
             sys.exit(1)
+
+    if not is_valid_url(args.URL):
+        print(f"{Fore.RED}The argument must be a URL{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
 
     print(f"\n{Fore.CYAN}Configuration:{Style.RESET_ALL}")
     print(f"Recursive: {Fore.YELLOW}{args.r}{Style.RESET_ALL}")

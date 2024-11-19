@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+from PIL import Image
+from PIL.ExifTags import TAGS
+from colorama import init, Fore, Style
+import hashlib
+from datetime import datetime
+
+# Initialize colorama
+init()
+
+def get_file_info(file_path):
+    file_stats = os.stat(file_path)
+    file_info = {
+        'Size': f"{file_stats.st_size / 1024:.2f} KB",
+        'Created': datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d %H:%M:%S'),
+        'Modified': datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    with open(file_path, 'rb') as f:
+        file_info['MD5'] = hashlib.md5(f.read()).hexdigest()
+    
+    return file_info
+
+def get_image_properties(img):
+    properties = {
+        'Format': img.format,
+        'Mode': img.mode,
+        'Size': f"{img.width}x{img.height} pixels",
+        'Color Depth': f"{img.bits} bits" if hasattr(img, 'bits') else 'Unknown',
+        'DPI': img.info.get('dpi', 'Not specified'),
+        'Animation': bool(getattr(img, 'is_animated', False)),
+        'Transparency': img.info.get('transparency') is not None,
+    }
+    if hasattr(img, 'palette') and img.palette:
+        properties['Palette'] = f"Present ({img.palette.mode})"
+    return properties
+
+def get_exif_data(image_path):
+    try:
+        with Image.open(image_path) as img:
+            # Get file information
+            print(f"\n{Fore.CYAN}File Information for {Fore.YELLOW}{image_path}{Style.RESET_ALL}:")
+            file_info = get_file_info(image_path)
+            print(f"\n{Fore.GREEN}-- File Information --{Style.RESET_ALL}")
+            for key, value in file_info.items():
+                print(f"{Fore.WHITE}{key}: {Fore.YELLOW}{value}{Style.RESET_ALL}")
+            
+            # Get image properties
+            img_properties = get_image_properties(img)
+            print(f"\n{Fore.GREEN}-- Image Properties --{Style.RESET_ALL}")
+            for key, value in img_properties.items():
+                print(f"{Fore.WHITE}{key}: {Fore.YELLOW}{value}{Style.RESET_ALL}")
+            
+            # Get EXIF data
+            if img.format != 'GIF':
+                try:
+                    exif_data = img._getexif() or {}
+                except AttributeError:
+                    exif_data = {}
+
+                if exif_data:
+                    print(f"\n{Fore.CYAN}EXIF Data for {Fore.YELLOW}{image_path}{Style.RESET_ALL}:")
+                    
+                    # Initialize categorized data
+                    categories = {
+                        'Image Information': ["DateTime", "Software", "ImageWidth", "ImageHeight"],
+                        'Camera Settings': ["Make", "Model", "ExposureTime", "FNumber", "ISOSpeedRatings", "FocalLength", "WhiteBalance"],
+                        'GPS Information': ["GPSLatitude", "GPSLongitude"],
+                    }
+                    
+                    categorized_data = {cat: {} for cat in categories}
+                    other_info = {}
+                    
+                    # Categorize EXIF data
+                    for tag, value in exif_data.items():
+                        try:
+                            tag_name = TAGS.get(tag, str(tag))
+                            # Skip if value is None or empty
+                            if value is None or value == '':
+                                continue
+                                
+                            # Categorize the data
+                            categorized = False
+                            for cat, tags in categories.items():
+                                if tag_name in tags:
+                                    categorized_data[cat][tag_name] = value
+                                    categorized = True
+                                    break
+                            
+                            if not categorized:
+                                other_info[tag_name] = value
+                        except Exception as e:
+                            continue
+                    
+                    # Print categorized data
+                    for category, data in categorized_data.items():
+                        if data:
+                            print(f"\n{Fore.GREEN}-- {category} --{Style.RESET_ALL}")
+                            for key, value in data.items():
+                                print(f"{Fore.WHITE}{key}: {Fore.YELLOW}{value}{Style.RESET_ALL}")
+                    
+                    if other_info:
+                        print(f"\n{Fore.GREEN}-- Other Information --{Style.RESET_ALL}")
+                        for key, value in other_info.items():
+                            print(f"{Fore.WHITE}{key}: {Fore.YELLOW}{value}{Style.RESET_ALL}")
+                else:
+                    print(f"\n{Fore.YELLOW}No EXIF data found for {image_path}.{Style.RESET_ALL}")
+            else:
+                print(f"\n{Fore.YELLOW}GIF format does not support EXIF data.{Style.RESET_ALL}")
+
+    except Exception as e:
+        print(f"{Fore.RED}Error processing {image_path}: {str(e)}{Style.RESET_ALL}")
+
+def process_images_from_path(path):
+    if os.path.isdir(path):
+        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')
+        found_images = False
+        
+        for root, _, files in os.walk(path):
+            for file in files:
+                if file.lower().endswith(image_extensions):
+                    found_images = True
+                    file_path = os.path.join(root, file)
+                    get_exif_data(file_path)
+        
+        if not found_images:
+            print(f"{Fore.YELLOW}No image files found in {path}{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.RED}Error: {path} is not a directory or does not exist.{Style.RESET_ALL}")
+
+def main():
+    if len(sys.argv) < 2:
+        print(f"{Fore.RED}Usage: {sys.argv[0]} <FILE1> [FILE2 ...] or <DIRECTORY>{Style.RESET_ALL}")
+        sys.exit(1)
+    
+    path_or_files = sys.argv[1:]
+    
+    if os.path.isdir(path_or_files[0]):
+        process_images_from_path(path_or_files[0])
+    else:
+        for file in path_or_files:
+            if os.path.isfile(file):
+                get_exif_data(file)
+            else:
+                print(f"{Fore.RED}Error: File {file} not found.{Style.RESET_ALL}")
+
+if __name__ == "__main__":
+    main()

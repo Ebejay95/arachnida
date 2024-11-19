@@ -1,0 +1,6 @@
+argparse
+colorama
+requests
+beautifulsoup4
+fake-useragent
+Pillow
